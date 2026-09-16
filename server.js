@@ -2,34 +2,36 @@ const express = require('express');
 const cors = require('cors');
 require('dotenv').config();
 const admin = require('firebase-admin');
-const fs = require('fs');
-const path = require('path');
 
-// Load Firebase credentials from JSON file
-const serviceAccountPath = path.join(__dirname, 'firebase-key.json');
+const requiredFirebaseEnv = [
+  'FIREBASE_PROJECT_ID',
+  'FIREBASE_PRIVATE_KEY',
+  'FIREBASE_CLIENT_EMAIL',
+];
 
-console.log('Loading firebase-key.json from:', serviceAccountPath);
-
-let serviceAccount;
-try {
-  const data = fs.readFileSync(serviceAccountPath, 'utf8');
-  serviceAccount = JSON.parse(data);
-  console.log('✅ Firebase credentials loaded');
-} catch (error) {
-  console.error('❌ Error loading firebase-key.json:', error.message);
-  process.exit(1);
+const missingFirebaseEnv = requiredFirebaseEnv.filter(name => !process.env[name]);
+if (missingFirebaseEnv.length > 0) {
+  throw new Error(`Missing Firebase environment variables: ${missingFirebaseEnv.join(', ')}`);
 }
 
-// Initialize Firebase Admin
-try {
-  admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount),
-  });
-  console.log('✅ Firebase Admin initialized successfully');
-} catch (error) {
-  console.error('❌ Firebase initialization failed:', error.message);
-  process.exit(1);
-}
+const serviceAccount = {
+  type: process.env.FIREBASE_TYPE || 'service_account',
+  project_id: process.env.FIREBASE_PROJECT_ID,
+  private_key_id: process.env.FIREBASE_PRIVATE_KEY_ID,
+  private_key: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+  client_email: process.env.FIREBASE_CLIENT_EMAIL,
+  client_id: process.env.FIREBASE_CLIENT_ID,
+  auth_uri: process.env.FIREBASE_AUTH_URI,
+  token_uri: process.env.FIREBASE_TOKEN_URI,
+  auth_provider_x509_cert_url: process.env.FIREBASE_AUTH_PROVIDER_X509_CERT_URL,
+  client_x509_cert_url: process.env.FIREBASE_CLIENT_X509_CERT_URL,
+  universe_domain: process.env.FIREBASE_UNIVERSE_DOMAIN,
+};
+
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount),
+});
+console.log('✅ Firebase Admin initialized successfully');
 
 const db = admin.firestore();
 const app = express();
