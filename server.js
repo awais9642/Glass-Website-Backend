@@ -51,7 +51,7 @@ const app = express();
 // ========================================
 
 const allowedOrigins = (
-  process.env.CORS_ORIGINS ||
+  //process.env.CORS_ORIGINS ||
   [
     'http://localhost:3000',
     'http://localhost:5173',
