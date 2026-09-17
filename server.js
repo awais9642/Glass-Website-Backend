@@ -112,10 +112,18 @@ const corsOptions = {
     }
 
     if (isAllowedOrigin(origin)) {
+      console.info('[CORS] allowed', {
+        origin,
+        normalizedOrigin: normalizeOrigin(origin),
+      });
       return callback(null, true);
     }
 
-    console.warn('CORS blocked origin:', origin);
+    console.warn('[CORS] blocked', {
+      origin,
+      normalizedOrigin: normalizeOrigin(origin),
+      allowedOrigins: [...allowedOrigins],
+    });
     // Do not throw here: returning false omits CORS headers and lets the
     // browser safely block a cross-origin response without creating a 500.
     return callback(null, false);
@@ -123,9 +131,30 @@ const corsOptions = {
 
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  // Reflect requested headers for an allowed origin. This prevents a browser
+  // preflight from failing when the frontend adds a safe custom header.
+  allowedHeaders: undefined,
+  maxAge: 86400,
   optionsSuccessStatus: 204,
 };
+
+// Log the exact browser preflight/request details before CORS handles it.
+// These logs contain no request body, credentials, or authorization values.
+app.use((req, res, next) => {
+  const origin = req.get('Origin');
+
+  if (origin) {
+    console.info('[CORS] request', {
+      method: req.method,
+      path: req.originalUrl,
+      origin,
+      requestedMethod: req.get('Access-Control-Request-Method') || null,
+      requestedHeaders: req.get('Access-Control-Request-Headers') || null,
+    });
+  }
+
+  next();
+});
 
 app.use(cors(corsOptions));
 app.options('*', cors(corsOptions));
