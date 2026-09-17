@@ -50,66 +50,60 @@ const app = express();
 // CORS CONFIGURATION
 // ========================================
 
-const allowedOrigins = (
-  //process.env.CORS_ORIGINS ||
-  [
-    'http://localhost:3000',
-    'http://localhost:5173',
-    'http://localhost:4173',
-    'https://faizannadeemts.com',
-    'https://www.faizannadeemts.com',
-  ].join(',')
-)
-  .split(',')
-  .map(origin => origin.trim())
+const defaultOrigins = [
+  'http://localhost:3000',
+  'http://localhost:5173',
+  'http://localhost:4173',
+  'https://faizannadeemts.com',
+  'https://www.faizannadeemts.com',
+];
+
+const envOrigins = process.env.CORS_ORIGINS
+  ? process.env.CORS_ORIGINS.split(',')
+  : defaultOrigins;
+
+// Normalize origins by trimming and removing trailing slashes
+const allowedOrigins = envOrigins
+  .map(origin => origin.trim().replace(/\/$/, ''))
   .filter(Boolean);
 
 console.log('Allowed CORS origins:', allowedOrigins);
 
 const corsOptions = {
   origin: (origin, callback) => {
-    // Allow requests without an Origin header
-    // (Postman, server-to-server requests, etc.)
+    // Allow non-browser / server-to-server requests
     if (!origin) {
       return callback(null, true);
     }
 
-    // Allow explicitly configured origins
-    if (allowedOrigins.includes(origin)) {
+    const normalizedOrigin = origin.replace(/\/$/, '');
+
+    if (allowedOrigins.includes(normalizedOrigin)) {
       return callback(null, true);
     }
 
-    // Optional: allow Vercel preview deployments
     if (
-      origin.endsWith('.vercel.app') &&
+      normalizedOrigin.endsWith('.vercel.app') &&
       process.env.ALLOW_VERCEL_PREVIEWS === 'true'
     ) {
       return callback(null, true);
     }
 
     console.log('❌ CORS blocked origin:', origin);
-
-    return callback(
-      new Error(`CORS origin not allowed: ${origin}`)
-    );
+    // Pass false instead of throwing an Error object to avoid 500 runtime crashes
+    return callback(null, false);
   },
 
   credentials: true,
-
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-
   allowedHeaders: ['Content-Type', 'Authorization'],
-
   optionsSuccessStatus: 204,
 };
 
-// Apply the same CORS configuration everywhere
 app.use(cors(corsOptions));
-
 app.options('*', cors(corsOptions));
 
 app.use(express.json());
-
 // ========================================
 // TEST ROUTE
 // ========================================
@@ -175,32 +169,24 @@ app.post('/api/contact', async (req, res) => {
     const { name, email, phone, service, message } = req.body;
 
     if (!name || name.trim() === '') {
-      return res.status(400).json({
-        error: 'Full Name is required',
-      });
+      return res.status(400).json({ error: 'Full Name is required' });
     }
 
     if (!email || email.trim() === '') {
-      return res.status(400).json({
-        error: 'Email is required',
-      });
+      return res.status(400).json({ error: 'Email is required' });
     }
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
     if (!emailRegex.test(email)) {
-      return res.status(400).json({
-        error: 'Please enter a valid email address',
-      });
+      return res.status(400).json({ error: 'Please enter a valid email address' });
     }
 
     if (!phone || phone.trim() === '') {
-      return res.status(400).json({
-        error: 'Phone Number is required',
-      });
+      return res.status(400).json({ error: 'Phone Number is required' });
     }
 
-    const phoneRegex = /^[\d\s\-+()]+$/;
+    // FIXED: Safely placed hyphen at the end of the character set
+    const phoneRegex = /^[\d\s+()-]+$/;
 
     if (
       !phoneRegex.test(phone) ||
@@ -212,9 +198,7 @@ app.post('/api/contact', async (req, res) => {
     }
 
     if (!message || message.trim() === '') {
-      return res.status(400).json({
-        error: 'Message is required',
-      });
+      return res.status(400).json({ error: 'Message is required' });
     }
 
     if (message.trim().length < 5) {
@@ -229,7 +213,7 @@ app.post('/api/contact', async (req, res) => {
       phone: phone.trim(),
       message: message.trim(),
       createdAt: new Date(),
-      ip: req.ip,
+      ip: req.ip || req.headers['x-forwarded-for'] || '',
     };
 
     if (service && service.trim() !== '') {
@@ -240,17 +224,16 @@ app.post('/api/contact', async (req, res) => {
 
     console.log('✅ Contact saved:', docRef.id);
 
-    res.json({
+    return res.json({
       success: true,
       id: docRef.id,
       message: 'Thank you! We will contact you soon.',
     });
   } catch (error) {
     console.error('Error saving contact:', error);
-    res.status(500).json({ error: error.message });
+    return res.status(500).json({ error: error.message });
   }
 });
-
 // ========================================
 // START SERVER
 // ========================================
