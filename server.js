@@ -70,29 +70,31 @@ const allowedOrigins = envOrigins
 console.log('Allowed CORS origins:', allowedOrigins);
 
 const corsOptions = {
-  origin: (origin, callback) => {
-    // Allow non-browser / server-to-server requests
-    if (!origin) {
-      return callback(null, true);
-    }
+  // origin: (origin, callback) => {
+  //   // Allow non-browser / server-to-server requests
+  //   if (!origin) {
+  //     return callback(null, true);
+  //   }
 
-    const normalizedOrigin = origin.replace(/\/$/, '');
+  //   const normalizedOrigin = origin.replace(/\/$/, '');
 
-    if (allowedOrigins.includes(normalizedOrigin)) {
-      return callback(null, true);
-    }
+  //   if (allowedOrigins.includes(normalizedOrigin)) {
+  //     return callback(null, true);
+  //   }
 
-    if (
-      normalizedOrigin.endsWith('.vercel.app') &&
-      process.env.ALLOW_VERCEL_PREVIEWS === 'true'
-    ) {
-      return callback(null, true);
-    }
+  //   if (
+  //     normalizedOrigin.endsWith('.vercel.app') &&
+  //     process.env.ALLOW_VERCEL_PREVIEWS === 'true'
+  //   ) {
+  //     return callback(null, true);
+  //   }
 
-    console.log('❌ CORS blocked origin:', origin);
-    // Pass false instead of throwing an Error object to avoid 500 runtime crashes
-    return callback(null, false);
-  },
+  //   console.log('❌ CORS blocked origin:', origin);
+  //   // Pass false instead of throwing an Error object to avoid 500 runtime crashes
+  //   return callback(null, false);
+  // },
+
+  origin: '*',
 
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
