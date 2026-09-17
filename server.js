@@ -37,7 +37,26 @@ const db = admin.firestore();
 const app = express();
 
 // Middleware
-app.use(cors());
+const allowedOrigins = (process.env.CORS_ORIGINS || [
+  'http://localhost:3000',
+  'http://localhost:5173',
+  'http://localhost:4173',
+].join(',')).split(',').map(origin => origin.trim()).filter(Boolean);
+
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+
+    return callback(new Error(`CORS origin not allowed: ${origin}`));
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  optionsSuccessStatus: 204,
+}));
+app.options('*', cors());
 app.use(express.json());
 
 // Test route
