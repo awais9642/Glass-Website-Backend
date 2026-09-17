@@ -62,39 +62,64 @@ const envOrigins = process.env.CORS_ORIGINS
   ? process.env.CORS_ORIGINS.split(',')
   : defaultOrigins;
 
-// Normalize origins by trimming and removing trailing slashes
-const allowedOrigins = envOrigins
-  .map(origin => origin.trim().replace(/\/$/, ''))
-  .filter(Boolean);
+const normalizeOrigin = origin => {
+  try {
+    const url = new URL(origin.trim());
 
-console.log('Allowed CORS origins:', allowedOrigins);
+    // CORS origins must be HTTP(S) origins. This also strips any path or
+    // trailing slash accidentally included in the environment variable.
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+      return null;
+    }
+
+    return url.origin;
+  } catch {
+    return null;
+  }
+};
+
+const allowedOrigins = new Set(
+  envOrigins.map(normalizeOrigin).filter(Boolean)
+);
+const allowVercelPreviews = process.env.ALLOW_VERCEL_PREVIEWS === 'true';
+
+console.log('Allowed CORS origins:', [...allowedOrigins]);
+
+const isAllowedOrigin = origin => {
+  const normalizedOrigin = normalizeOrigin(origin);
+
+  if (!normalizedOrigin) {
+    return false;
+  }
+
+  if (allowedOrigins.has(normalizedOrigin)) {
+    return true;
+  }
+
+  if (!allowVercelPreviews) {
+    return false;
+  }
+
+  return new URL(normalizedOrigin).hostname.endsWith('.vercel.app');
+};
 
 const corsOptions = {
-  // origin: (origin, callback) => {
-  //   // Allow non-browser / server-to-server requests
-  //   if (!origin) {
-  //     return callback(null, true);
-  //   }
+  origin: (origin, callback) => {
+    // Requests without an Origin header are non-browser or same-origin
+    // requests and do not need CORS protection.
+    if (!origin) {
+      return callback(null, true);
+    }
 
-  //   const normalizedOrigin = origin.replace(/\/$/, '');
+    if (isAllowedOrigin(origin)) {
+      return callback(null, true);
+    }
 
-  //   if (allowedOrigins.includes(normalizedOrigin)) {
-  //     return callback(null, true);
-  //   }
-
-  //   if (
-  //     normalizedOrigin.endsWith('.vercel.app') &&
-  //     process.env.ALLOW_VERCEL_PREVIEWS === 'true'
-  //   ) {
-  //     return callback(null, true);
-  //   }
-
-  //   console.log('❌ CORS blocked origin:', origin);
-  //   // Pass false instead of throwing an Error object to avoid 500 runtime crashes
-  //   return callback(null, false);
-  // },
-
-  origin: '*',
+    console.warn('CORS blocked origin:', origin);
+    // Do not throw here: returning false omits CORS headers and lets the
+    // browser safely block a cross-origin response without creating a 500.
+    return callback(null, false);
+  },
 
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
